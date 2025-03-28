@@ -4,6 +4,8 @@ from .tiny_imagenet import get_tinyimagenet_dataloader, get_tinyimagenet_dataloa
 
 
 def get_dataset(cfg):
+    use_ddp = cfg.EXPERIMENT.DDP
+    
     if cfg.DATASET.TYPE == "cifar100":
         if cfg.DISTILLER.TYPE == "CRD":
             train_loader, val_loader, num_data = get_cifar100_dataloaders_sample(
@@ -12,12 +14,14 @@ def get_dataset(cfg):
                 num_workers=cfg.DATASET.NUM_WORKERS,
                 k=cfg.CRD.NCE.K,
                 mode=cfg.CRD.MODE,
+                use_ddp=use_ddp,
             )
         else:
             train_loader, val_loader, num_data = get_cifar100_dataloaders(
                 batch_size=cfg.SOLVER.BATCH_SIZE,
                 val_batch_size=cfg.DATASET.TEST.BATCH_SIZE,
                 num_workers=cfg.DATASET.NUM_WORKERS,
+                use_ddp=use_ddp,
             )
         num_classes = 100
     elif cfg.DATASET.TYPE == "imagenet":
@@ -27,12 +31,14 @@ def get_dataset(cfg):
                 val_batch_size=cfg.DATASET.TEST.BATCH_SIZE,
                 num_workers=cfg.DATASET.NUM_WORKERS,
                 k=cfg.CRD.NCE.K,
+                use_ddp=use_ddp,
             )
         else:
             train_loader, val_loader, num_data = get_imagenet_dataloaders(
                 batch_size=cfg.SOLVER.BATCH_SIZE,
                 val_batch_size=cfg.DATASET.TEST.BATCH_SIZE,
                 num_workers=cfg.DATASET.NUM_WORKERS,
+                use_ddp=use_ddp,
             )
         num_classes = 1000
     elif cfg.DATASET.TYPE == "tiny_imagenet":
@@ -42,12 +48,14 @@ def get_dataset(cfg):
                 val_batch_size=cfg.DATASET.TEST.BATCH_SIZE,
                 num_workers=cfg.DATASET.NUM_WORKERS,
                 k=cfg.CRD.NCE.K,
+                use_ddp=use_ddp,
             )
         else:
             train_loader, val_loader, num_data = get_tinyimagenet_dataloader(
                 batch_size=cfg.SOLVER.BATCH_SIZE,
                 val_batch_size=cfg.DATASET.TEST.BATCH_SIZE,
                 num_workers=cfg.DATASET.NUM_WORKERS,
+                use_ddp=use_ddp,
             )
         num_classes = 200
     else:

@@ -1,10 +1,12 @@
 import os
 import torch
 import torch.nn as nn
+import torch.distributed as dist
 import numpy as np
 import sys
 import time
 from tqdm import tqdm
+from ..utils import dist_fn
 
 
 class AverageMeter(object):
@@ -27,10 +29,13 @@ class AverageMeter(object):
 
 
 def validate(val_loader, distiller):
+    IS_MASTER = bool(int(os.environ['IS_MASTER_NODE']))
+    
     batch_time, losses, top1, top5 = [AverageMeter() for _ in range(4)]
     criterion = nn.CrossEntropyLoss()
     num_iter = len(val_loader)
-    pbar = tqdm(range(num_iter))
+    if IS_MASTER:
+        pbar = tqdm(range(num_iter))
 
     distiller.eval()
     with torch.no_grad():
@@ -40,22 +45,28 @@ def validate(val_loader, distiller):
             image = image.cuda(non_blocking=True)
             target = target.cuda(non_blocking=True)
             output = distiller(image=image)
-            loss = criterion(output, target)
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            batch_size = image.size(0)
+            
+            target_all = dist_fn.gather(target)
+            output_all = dist_fn.gather(output)
+            loss = criterion(output_all, target_all)
+            batch_size = len(target_all)
+            
+            acc1, acc5 = accuracy(output_all, target_all, topk=(1, 5))
             losses.update(loss.cpu().detach().numpy().mean(), batch_size)
             top1.update(acc1[0], batch_size)
             top5.update(acc5[0], batch_size)
-
-            # measure elapsed time
             batch_time.update(time.time() - start_time)
             start_time = time.time()
-            msg = "Top-1:{top1.avg:.3f}| Top-5:{top5.avg:.3f}".format(
-                top1=top1, top5=top5
-            )
-            pbar.set_description(log_msg(msg, "EVAL"))
-            pbar.update()
-    pbar.close()
+
+            # measure elapsed time
+            if IS_MASTER:
+                msg = "Top-1:{top1.avg:.3f}| Top-5:{top5.avg:.3f}".format(
+                    top1=top1, top5=top5
+                )
+                pbar.set_description(log_msg(msg, "EVAL"))
+                pbar.update()
+    if IS_MASTER:
+        pbar.close()
     return top1.avg, top5.avg, losses.avg
 
 
@@ -100,4 +111,4 @@ def save_checkpoint(obj, path):
 
 def load_checkpoint(path):
     with open(path, "rb") as f:
-        return torch.load(f, map_location="cpu")
+        return torch.load(f, map_location="cpu", weights_only=False)

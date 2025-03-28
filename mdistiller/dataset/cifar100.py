@@ -1,9 +1,8 @@
 import os
 import numpy as np
-from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from PIL import Image
-
+from ._common import make_loader
 
 def get_data_folder():
     data_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../data")
@@ -136,7 +135,7 @@ def get_cifar100_test_transform():
     )
 
 
-def get_cifar100_dataloaders(batch_size, val_batch_size, num_workers):
+def get_cifar100_dataloaders(batch_size, val_batch_size, num_workers, use_ddp):
     data_folder = get_data_folder()
     train_transform = get_cifar100_train_transform()
     test_transform = get_cifar100_test_transform()
@@ -148,21 +147,14 @@ def get_cifar100_dataloaders(batch_size, val_batch_size, num_workers):
         root=data_folder, download=True, train=False, transform=test_transform
     )
 
-    train_loader = DataLoader(
-        train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers
-    )
-    test_loader = DataLoader(
-        test_set,
-        batch_size=val_batch_size,
-        shuffle=False,
-        num_workers=1,
-    )
+    train_loader = make_loader(train_set, batch_size, num_workers, shuffle=True, use_ddp=use_ddp)
+    test_loader = make_loader(test_set, val_batch_size, num_workers, shuffle=False, use_ddp=use_ddp)
     return train_loader, test_loader, num_data
 
 
 # CIFAR-100 for CRD
 def get_cifar100_dataloaders_sample(
-    batch_size, val_batch_size, num_workers, k, mode="exact"
+    batch_size, val_batch_size, num_workers, k, use_ddp, mode="exact"
 ):
     data_folder = get_data_folder()
     train_transform = get_cifar100_train_transform()
@@ -183,13 +175,6 @@ def get_cifar100_dataloaders_sample(
         root=data_folder, download=True, train=False, transform=test_transform
     )
 
-    train_loader = DataLoader(
-        train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers
-    )
-    test_loader = DataLoader(
-        test_set,
-        batch_size=val_batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-    )
+    train_loader = make_loader(train_set, batch_size, num_workers, shuffle=True, use_ddp=use_ddp)
+    test_loader = make_loader(test_set, val_batch_size, num_workers, shuffle=False, use_ddp=use_ddp)
     return train_loader, test_loader, num_data

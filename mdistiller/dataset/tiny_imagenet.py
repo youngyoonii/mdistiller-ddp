@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms
 import numpy as np
+from ._common import make_loader
 
 
 data_folder = os.path.join(
@@ -70,7 +71,7 @@ class ImageFolderInstanceSample(ImageFolderInstance):
             return img, target, index
 
 
-def get_tinyimagenet_dataloader(batch_size, val_batch_size, num_workers):
+def get_tinyimagenet_dataloader(batch_size, val_batch_size, num_workers, use_ddp):
     """Data Loader for tiny-imagenet"""
     train_transform = transforms.Compose([
                 transforms.RandomRotation(20),
@@ -87,16 +88,12 @@ def get_tinyimagenet_dataloader(batch_size, val_batch_size, num_workers):
     train_set = ImageFolderInstance(train_folder, transform=train_transform)
     num_data = len(train_set)
     test_set = datasets.ImageFolder(test_folder, transform=test_transform)
-    train_loader = DataLoader(
-        train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers
-    )
-    test_loader = DataLoader(
-        test_set, batch_size=val_batch_size, shuffle=False, num_workers=1
-    )
+    train_loader = make_loader(train_set, batch_size, num_workers, shuffle=True, use_ddp=use_ddp)
+    test_loader = make_loader(test_set, val_batch_size, num_workers=1, shuffle=False, use_ddp=use_ddp)
     return train_loader, test_loader, num_data
 
 
-def get_tinyimagenet_dataloader_sample(batch_size, val_batch_size, num_workers, k):
+def get_tinyimagenet_dataloader_sample(batch_size, val_batch_size, num_workers, k, use_ddp):
     """Data Loader for tiny-imagenet"""
     train_transform = transforms.Compose([
                 transforms.RandomRotation(20),
@@ -113,10 +110,6 @@ def get_tinyimagenet_dataloader_sample(batch_size, val_batch_size, num_workers, 
     train_set = ImageFolderInstanceSample(train_folder, transform=train_transform, is_sample=True, k=k)
     num_data = len(train_set)
     test_set = datasets.ImageFolder(test_folder, transform=test_transform)
-    train_loader = DataLoader(
-        train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers
-    )
-    test_loader = DataLoader(
-        test_set, batch_size=val_batch_size, shuffle=False, num_workers=1
-    )
+    train_loader = make_loader(train_set, batch_size, num_workers, shuffle=True, use_ddp=use_ddp)
+    test_loader = make_loader(test_set, val_batch_size, num_workers=1, shuffle=False, use_ddp=use_ddp)
     return train_loader, test_loader, num_data
