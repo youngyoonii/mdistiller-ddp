@@ -153,6 +153,15 @@ sudo python3 setup.py develop
   python3 tools/train.py --cfg configs/imagenet/r34_r18/dkd.yaml
   ```
 
+  DDP training is now available:
+  ```bash
+  # get the number of active devices and set the number of OpenMP threads.
+  export CUDA_DEVICE_COUNT=$(python -c "import torch; print(torch.cuda.device_count())")
+  export OMP_NUM_THREADS=4
+  # run elastic launch to train DDP. 
+  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/train_ddp.py --cfg configs/imagenet/r34_r18/dkd.yaml
+  ```
+
 4. Training on MS-COCO
 
 - see [detection.md](detection/README.md)
