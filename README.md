@@ -112,7 +112,16 @@ sudo python3 setup.py develop
 - The registeration: <https://wandb.ai/home>.
 - If you don't want wandb as your logger, set `CFG.LOG.WANDB` as `False` at `mdistiller/engine/cfg.py`.
 
-1. Evaluation
+1. DDP setup
+
+    ```bash
+    # for instance, FitNet method.
+    # get the number of active devices and set the number of OpenMP threads.
+    export CUDA_DEVICE_COUNT=$(python -c "import torch; print(torch.cuda.device_count())")
+    export OMP_NUM_THREADS=4
+    ```
+
+2. Evaluation
 
 - You can evaluate the performance of our models or models trained by yourself.
 
@@ -122,52 +131,47 @@ sudo python3 setup.py develop
 
   ```bash
   # evaluate teachers
-  python3 tools/eval.py -m resnet32x4 # resnet32x4 on cifar100
-  python3 tools/eval.py -m ResNet34 -d imagenet # ResNet34 on imagenet
+  # resnet32x4 on cifar100
+  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/eval.py -m resnet32x4
+  # ResNet34 on imagenet
+  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/eval.py -m ResNet34 -d imagenet
   
   # evaluate students
-  python3 tools/eval.p -m resnet8x4 -c download_ckpts/dkd_resnet8x4 # dkd-resnet8x4 on cifar100
-  python3 tools/eval.p -m MobileNetV1 -c download_ckpts/imgnet_dkd_mv1 -d imagenet # dkd-mv1 on imagenet
-  python3 tools/eval.p -m model_name -c output/your_exp/student_best # your checkpoints
-  ```
+  # dkd-resnet8x4 on cifar100
+  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/eval.py -m resnet8x4 -c download_ckpts/dkd_resnet8x4 
+  # dkd-mv1 on imagenet
+  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/eval.py -m MobileNetV1 -c download_ckpts/imgnet_dkd_mv1 -d imagenet 
+  # your checkpoints
+  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/eval.py -m model_name -c output/your_exp/student_best 
+  
 
 
-2. Training on CIFAR-100
+3. Training on CIFAR-100
 
 - Download the `cifar_teachers.tar` at <https://github.com/megvii-research/mdistiller/releases/tag/checkpoints> and untar it to `./download_ckpts` via `tar xvf cifar_teachers.tar`.
 
   ```bash
   # for instance, our DKD method.
-  python3 tools/train.py --cfg configs/cifar100/dkd/res32x4_res8x4.yaml
+  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/train.py --cfg configs/cifar100/dkd/res32x4_res8x4.yaml
 
   # you can also change settings at command line
-  python3 tools/train.py --cfg configs/cifar100/dkd/res32x4_res8x4.yaml SOLVER.BATCH_SIZE 128 SOLVER.LR 0.1
+  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/train.py --cfg configs/cifar100/dkd/res32x4_res8x4.yaml SOLVER.BATCH_SIZE 128 SOLVER.LR 0.1
   ```
 
-3. Training on ImageNet
+4. Training on ImageNet
 
 - Download the dataset at <https://image-net.org/> and put them to `./data/imagenet`
 
   ```bash
-  # for instance, our DKD method.
-  python3 tools/train.py --cfg configs/imagenet/r34_r18/dkd.yaml
+  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/train.py --cfg configs/imagenet/r34_r18/fitnet.yaml
   ```
 
-  DDP training is now available:
-  ```bash
-  # get the number of active devices and set the number of OpenMP threads.
-  export CUDA_DEVICE_COUNT=$(python -c "import torch; print(torch.cuda.device_count())")
-  export OMP_NUM_THREADS=4
-  # run elastic launch to train DDP. 
-  torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/train_ddp.py --cfg configs/imagenet/r34_r18/dkd.yaml
-  ```
-
-4. Training on MS-COCO
+5. Training on MS-COCO
 
 - see [detection.md](detection/README.md)
 
 
-5. Extension: Visualizations
+6. Extension: Visualizations
 
 - Jupyter notebooks: [tsne](tools/visualizations/tsne.ipynb) and [correlation_matrices](tools/visualizations/correlation.ipynb)
 
