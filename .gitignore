@@ -124,3 +124,10 @@ wandb/
 
 # download ckpts
 download_ckpts/
+
+# VS Code
+*.code-workspace
+
+# Test, temporary
+*temp*
+*recipe*
