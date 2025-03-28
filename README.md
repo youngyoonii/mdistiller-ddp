@@ -143,8 +143,7 @@ sudo python3 setup.py develop
   torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/eval.py -m MobileNetV1 -c download_ckpts/imgnet_dkd_mv1 -d imagenet 
   # your checkpoints
   torchrun --nproc-per-node=$CUDA_DEVICE_COUNT tools/eval.py -m model_name -c output/your_exp/student_best 
-  
-
+  ```
 
 3. Training on CIFAR-100
 
