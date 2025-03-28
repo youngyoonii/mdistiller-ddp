@@ -1,6 +1,8 @@
+import os
 import argparse
 import torch
 import torch.backends.cudnn as cudnn
+import torch.distributed as dist
 
 cudnn.benchmark = True
 
@@ -13,6 +15,13 @@ from mdistiller.engine.cfg import CFG as cfg
 
 
 if __name__ == "__main__":
+    rank = int(os.environ['LOCAL_RANK'])
+    world_size = int(os.environ['WORLD_SIZE'])
+    os.environ['IS_MASTER_NODE'] = str(int(rank == 0))
+    
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model", type=str, default="")
     parser.add_argument("-c", "--ckpt", type=str, default="pretrain")
@@ -29,7 +38,7 @@ if __name__ == "__main__":
     cfg.DATASET.TYPE = args.dataset
     cfg.DATASET.TEST.BATCH_SIZE = args.batch_size
     if args.dataset == "imagenet":
-        val_loader = get_imagenet_val_loader(args.batch_size)
+        val_loader = get_imagenet_val_loader(args.batch_size, use_ddp=False)
         if args.ckpt == "pretrain":
             model = imagenet_model_dict[args.model](pretrained=True)
         else:
@@ -44,5 +53,5 @@ if __name__ == "__main__":
         model.load_state_dict(load_checkpoint(ckpt)["model"])
     model = Vanilla(model)
     model = model.cuda()
-    model = torch.nn.DataParallel(model)
     test_acc, test_acc_top5, test_loss = validate(val_loader, model)
+    dist.destroy_process_group()

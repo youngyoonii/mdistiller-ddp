@@ -3,6 +3,8 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel
 
 cudnn.benchmark = True
 
@@ -16,6 +18,8 @@ from mdistiller.engine import trainer_dict
 
 
 def main(cfg, resume, opts):
+    IS_MASTER = bool(int(os.environ['IS_MASTER_NODE']))
+    
     experiment_name = cfg.EXPERIMENT.NAME
     if experiment_name == "":
         experiment_name = cfg.EXPERIMENT.TAG
@@ -25,17 +29,19 @@ def main(cfg, resume, opts):
         tags += addtional_tags
         experiment_name += ",".join(addtional_tags)
     experiment_name = os.path.join(cfg.EXPERIMENT.PROJECT, experiment_name)
-    if cfg.LOG.WANDB:
-        try:
-            import wandb
+    if IS_MASTER:
+        if cfg.LOG.WANDB:
+            try:
+                import wandb
 
-            wandb.init(project=cfg.EXPERIMENT.PROJECT, name=experiment_name, tags=tags)
-        except:
-            print(log_msg("Failed to use WANDB", "INFO"))
-            cfg.LOG.WANDB = False
+                wandb.init(project=cfg.EXPERIMENT.PROJECT, name=experiment_name, tags=tags)
+            except:
+                print(log_msg("Failed to use WANDB", "INFO"))
+                cfg.LOG.WANDB = False
 
     # cfg & loggers
-    show_cfg(cfg)
+    if IS_MASTER:
+        show_cfg(cfg)
     # init dataloader & models
     train_loader, val_loader, num_data, num_classes = get_dataset(cfg)
 
@@ -52,7 +58,8 @@ def main(cfg, resume, opts):
         distiller = distiller_dict[cfg.DISTILLER.TYPE](model_student)
     # distillation
     else:
-        print(log_msg("Loading teacher model", "INFO"))
+        if IS_MASTER:
+            print(log_msg("Loading teacher model", "INFO"))
         if cfg.DATASET.TYPE == "imagenet":
             model_teacher = imagenet_model_dict[cfg.DISTILLER.TEACHER](pretrained=True)
             model_student = imagenet_model_dict[cfg.DISTILLER.STUDENT](pretrained=False)
@@ -75,9 +82,10 @@ def main(cfg, resume, opts):
             distiller = distiller_dict[cfg.DISTILLER.TYPE](
                 model_student, model_teacher, cfg
             )
-    distiller = torch.nn.DataParallel(distiller.cuda())
+    distiller = distiller.cuda()
+    distiller = DistributedDataParallel(distiller, device_ids=[rank], find_unused_parameters=True)
 
-    if cfg.DISTILLER.TYPE != "NONE":
+    if (cfg.DISTILLER.TYPE != "NONE") and IS_MASTER:
         print(
             log_msg(
                 "Extra parameters of {}: {}\033[0m".format(
@@ -96,6 +104,10 @@ def main(cfg, resume, opts):
 
 if __name__ == "__main__":
     import argparse
+    
+    rank = int(os.environ['LOCAL_RANK'])
+    world_size = int(os.environ['WORLD_SIZE'])
+    os.environ['IS_MASTER_NODE'] = str(int(rank == 0))
 
     parser = argparse.ArgumentParser("training for knowledge distillation.")
     parser.add_argument("--cfg", type=str, default="")
@@ -105,5 +117,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     cfg.merge_from_file(args.cfg)
     cfg.merge_from_list(args.opts)
+    cfg.EXPERIMENT.DDP = True
+    cfg.DATASET.NUM_WORKERS //= world_size
+    cfg.DATASET.TEST.BATCH_SIZE //= world_size
+    cfg.SOLVER.BATCH_SIZE //= world_size
     cfg.freeze()
+    
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
     main(cfg, args.resume, args.opts)
+    dist.destroy_process_group()
