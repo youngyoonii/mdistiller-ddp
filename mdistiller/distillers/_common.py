@@ -33,8 +33,17 @@ class ConvReg(nn.Module):
 def get_feat_shapes(student, teacher, input_size):
     data = torch.randn(1, 3, *input_size)
     with torch.no_grad():
-        _, feat_s = student(data)
-        _, feat_t = teacher(data)
-    feat_s_shapes = [f.shape for f in feat_s["feats"]]
-    feat_t_shapes = [f.shape for f in feat_t["feats"]]
+        feat_s = None if student is None else student(data)[1]
+        feat_t = None if teacher is None else teacher(data)[1]
+    feat_s_shapes = None if feat_s is None else [f.shape for f in feat_s["feats"]]
+    feat_t_shapes = None if feat_t is None else [f.shape for f in feat_t["feats"]]
     return feat_s_shapes, feat_t_shapes
+
+
+class Lambda(nn.Module):
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+    
+    def forward(self, *args, **kwargs):
+        return self.fn(*args, **kwargs)

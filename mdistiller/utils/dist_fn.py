@@ -3,6 +3,10 @@ import torch
 import torch.distributed as dist
 
 
+def is_initialized() -> bool:
+    return dist.is_initialized()
+
+
 def broadcast(x: torch.Tensor, src: int=0) -> torch.Tensor:
     dist.broadcast(x, src=src)
     return x

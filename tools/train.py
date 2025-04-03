@@ -88,7 +88,7 @@ def main(cfg, resume, opts):
     if (cfg.DISTILLER.TYPE != "NONE") and IS_MASTER:
         print(
             log_msg(
-                "Extra parameters of {}: {}\033[0m".format(
+                "Extra parameters of {}: {:,d}\033[0m".format(
                     cfg.DISTILLER.TYPE, distiller.module.get_extra_parameters()
                 ),
                 "INFO",

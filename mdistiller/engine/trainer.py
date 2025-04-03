@@ -80,6 +80,14 @@ class BaseTrainer(object):
                 lines.append("{}: {:.2f}".format(k, v) + os.linesep)
             lines.append("-" * 25 + os.linesep)
             writer.writelines(lines)
+        # worklog.yaml
+        with open(os.path.join(self.log_path, 'worklog.yaml'), 'a') as writer:
+            lines = [
+                '- ' + lines[1],
+                *['  ' + line for line in lines[2:-1]],
+                '\n',
+            ]
+            writer.writelines(lines)
 
     def train(self, resume=False):
         IS_MASTER = bool(int(os.environ['IS_MASTER_NODE']))

@@ -8,6 +8,10 @@ class Distiller(nn.Module):
         super(Distiller, self).__init__()
         self.student = student
         self.teacher = teacher
+        
+    @property
+    def module(self):
+        return self
 
     def train(self, mode=True):
         # teacher as eval mode by default
