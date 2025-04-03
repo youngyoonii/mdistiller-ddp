@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import math
+from .._base import ModelBase
 
 __all__ = ["mobilenetv2_T_w", "mobile_half"]
 
@@ -11,7 +12,6 @@ def conv_bn(inp, oup, stride):
     return nn.Sequential(
         nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
         nn.BatchNorm2d(oup),
-        nn.ReLU(inplace=True),
     )
 
 
@@ -64,7 +64,7 @@ class InvertedResidual(nn.Module):
             return self.conv(x)
 
 
-class MobileNetV2(nn.Module):
+class MobileNetV2(nn.Module, ModelBase):
     """mobilenetV2"""
 
     def __init__(self, T, feature_dim, input_size=32, width_mult=1.0, remove_avg=False):
@@ -133,22 +133,51 @@ class MobileNetV2(nn.Module):
 
     def get_stage_channels(self):
         return self.stage_channels
+    
+    def forward_stem(self, x):
+        return self.conv1(x)
+
+    def get_layers(self):
+        return nn.Sequential(
+            nn.Sequential(
+                self.blocks[0],
+                self.blocks[1],
+            ),
+            self.blocks[2],
+            nn.Sequential(
+                self.blocks[3],
+                self.blocks[4],
+            ),
+            nn.Sequential(
+                self.blocks[5],
+                self.blocks[6],
+            ),
+        )
+
+    def forward_pool(self, x):
+        out = self.conv2(x)
+        if not self.remove_avg:
+            out = self.avgpool(out)
+        return out.reshape(out.size(0), -1)
+
+    def get_head(self):
+        return self.classifier
 
     def forward(self, x):
         out = self.conv1(x)
         f0 = out
-        out = self.blocks[0](out)
+        out = self.blocks[0](torch.relu(out))
         out = self.blocks[1](out)
         f1 = out
-        out = self.blocks[2](out)
+        out = self.blocks[2](torch.relu(out))
         f2 = out
-        out = self.blocks[3](out)
+        out = self.blocks[3](torch.relu(out))
         out = self.blocks[4](out)
         f3 = out
-        out = self.blocks[5](out)
+        out = self.blocks[5](torch.relu(out))
         out = self.blocks[6](out)
         f4 = out
-        out = self.conv2(out)
+        out = self.conv2(torch.relu(out))
 
         if not self.remove_avg:
             out = self.avgpool(out)
@@ -157,7 +186,8 @@ class MobileNetV2(nn.Module):
         out = self.classifier(out)
 
         feats = {}
-        feats["feats"] = [f0, f1, f2, f3, f4]
+        feats["preact_feats"] = [f1, f2, f3, f4]
+        feats["feats"] = [torch.relu(f1), torch.relu(f2), torch.relu(f3), torch.relu(f4)]
         feats["pooled_feat"] = avg
 
         return out, feats

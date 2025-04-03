@@ -1,8 +1,10 @@
+from typing import Literal
 import torch
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
 import torch.nn.functional as F
+from .._base import ModelBase
 
 
 __all__ = ["ResNet", "resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
@@ -98,7 +100,7 @@ class Bottleneck(nn.Module):
         return out
 
 
-class ResNet(nn.Module):
+class ResNet(nn.Module, ModelBase):
     def __init__(self, block, layers, num_classes=1000):
         self.inplanes = 64
         super(ResNet, self).__init__()
@@ -160,18 +162,43 @@ class ResNet(nn.Module):
 
     def get_stage_channels(self):
         return [256, 512, 1024, 2048]
+    
+    def get_arch(self) -> Literal['cnn', 'transformer']:
+        return 'cnn'
+    
+    def forward_stem(self, x):
+        x = self.conv1(x)
+        stem = self.bn1(x)
+        x = self.relu(stem)
+        x = self.maxpool(x)
+        return x
+    
+    def get_layers(self):
+        return nn.Sequential(
+            self.layer1,
+            self.layer2,
+            self.layer3,
+            self.layer4,
+        )
+        
+    def forward_pool(self, x):
+        x = self.avgpool(F.relu(x))
+        x = x.view(x.size(0), -1)
+        return x
+        
+    def get_head(self):
+        return self.fc
 
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
-        stem = x
         x = self.relu(x)
         x = self.maxpool(x)
 
         feat1 = self.layer1(x)
-        feat2 = self.layer2(feat1)
-        feat3 = self.layer3(feat2)
-        feat4 = self.layer4(feat3)
+        feat2 = self.layer2(torch.relu(feat1))
+        feat3 = self.layer3(torch.relu(feat2))
+        feat4 = self.layer4(torch.relu(feat3))
 
         x = self.avgpool(F.relu(feat4))
         x = x.view(x.size(0), -1)
@@ -181,13 +208,12 @@ class ResNet(nn.Module):
         feats = {}
         feats["pooled_feat"] = avg
         feats["feats"] = [
-            F.relu(stem),
             F.relu(feat1),
             F.relu(feat2),
             F.relu(feat3),
             F.relu(feat4),
         ]
-        feats["preact_feats"] = [stem, feat1, feat2, feat3, feat4]
+        feats["preact_feats"] = [feat1, feat2, feat3, feat4]
 
         return out, feats
 
@@ -245,3 +271,11 @@ def resnet152(pretrained=False, **kwargs):
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls["resnet152"]))
     return model
+
+
+if __name__ == '__main__':
+    from .._base import test_model
+    model = resnet18()
+    x = torch.randn(2, 3, 224, 224)
+    assert test_model(model, x)
+    print("ResNet passed")

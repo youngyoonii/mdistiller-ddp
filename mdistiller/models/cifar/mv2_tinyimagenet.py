@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from .._base import Lambda, ModelBase
 
 
 class LinearBottleNeck(nn.Module):
@@ -42,7 +43,6 @@ class MobileNetV2(nn.Module):
         self.pre = nn.Sequential(
             nn.Conv2d(3, 32, 1, padding=1),
             nn.BatchNorm2d(32),
-            nn.ReLU6(inplace=True)
         )
 
         self.stage1 = LinearBottleNeck(32, 16, 1, 1)
@@ -60,18 +60,49 @@ class MobileNetV2(nn.Module):
         )
 
         self.conv2 = nn.Conv2d(1280, num_classes, 1)
+    
+    def activate(self, x):
+        return F.relu6(x)
+        
+    def forward_stem(self, x):
+        return self.pre(x)
+
+    def get_layers(self):
+        return nn.Sequential(
+            nn.Sequential(
+                self.stage1,
+                self.stage2,
+            ),
+            self.stage3,
+            self.stage4,
+            nn.Sequential(
+                self.stage5,
+                self.stage6,
+                self.stage7,
+                self.conv1,
+            ),
+        )
+
+    def forward_pool(self, x):
+        return F.adaptive_avg_pool2d(x, 1)
+
+    def get_head(self):
+        return nn.Sequential(
+            self.conv2,
+            nn.Flatten(),
+        )
 
     def forward(self, x):
-        x = self.pre(x)
+        x = F.relu6(self.pre(x))
         f0 = x
-        x = self.stage1(x)
+        x = self.stage1(F.relu6(x))
         x = self.stage2(x)
         f1 = x
-        x = self.stage3(x)
+        x = self.stage3(F.relu6(x))
         f2 = x
-        x = self.stage4(x)
+        x = self.stage4(F.relu6(x))
         f3 = x
-        x = self.stage5(x)
+        x = self.stage5(F.relu6(x))
         x = self.stage6(x)
         x = self.stage7(x)
         x = self.conv1(x)
@@ -81,7 +112,8 @@ class MobileNetV2(nn.Module):
         x = self.conv2(x)
         x = x.view(x.size(0), -1)
         feats = {}
-        feats["feats"] = [f0, f1, f2, f3, f4]
+        feats["preact_feats"] = [f1, f2, f3, f4]
+        feats["feats"] = [F.relu6(f1), F.relu6(f2), F.relu6(f3), F.relu6(f4)]
         feats["pooled_feat"] = avg
 
         return x, feats

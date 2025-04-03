@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from .._base import ModelBase
 
 
 __all__ = ["wrn"]
@@ -71,7 +72,7 @@ class NetworkBlock(nn.Module):
         return self.layer(x)
 
 
-class WideResNet(nn.Module):
+class WideResNet(nn.Module, ModelBase):
     def __init__(self, depth, num_classes, widen_factor=1, dropRate=0.0):
         super(WideResNet, self).__init__()
         nChannels = [16, 16 * widen_factor, 32 * widen_factor, 64 * widen_factor]
@@ -122,15 +123,33 @@ class WideResNet(nn.Module):
 
     def get_stage_channels(self):
         return self.stage_channels
+    
+    def forward_stem(self, x):
+        return self.conv1(x)
+
+    def get_layers(self):
+        return nn.Sequential(
+            self.block1,
+            self.block2,
+            self.block3,
+        )
+
+    def forward_pool(self, x):
+        out = self.relu(self.bn1(x))
+        out = F.avg_pool2d(out, 8)
+        return out.reshape(-1, self.nChannels)
+
+    def get_head(self):
+        return self.fc
 
     def forward(self, x):
-        out = self.conv1(x)
+        out = torch.relu(self.conv1(x))
         f0 = out
-        out = self.block1(out)
+        out = self.block1(torch.relu(out))
         f1 = out
-        out = self.block2(out)
+        out = self.block2(torch.relu(out))
         f2 = out
-        out = self.block3(out)
+        out = self.block3(torch.relu(out))
         f3 = out
         out = self.relu(self.bn1(out))
         out = F.avg_pool2d(out, 8)
@@ -138,13 +157,9 @@ class WideResNet(nn.Module):
         f4 = out
         out = self.fc(out)
 
-        f1_pre = self.block2.layer[0].bn1(f1)
-        f2_pre = self.block3.layer[0].bn1(f2)
-        f3_pre = self.bn1(f3)
-
         feats = {}
-        feats["feats"] = [f0, f1, f2, f3]
-        feats["preact_feats"] = [f0, f1_pre, f2_pre, f3_pre]
+        feats["feats"] = [torch.relu(f1), torch.relu(f2), torch.relu(f3)]
+        feats["preact_feats"] = [f1, f2, f3]
         feats["pooled_feat"] = f4
 
         return out, feats

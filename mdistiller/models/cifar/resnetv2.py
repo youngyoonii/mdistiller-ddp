@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from .._base import ModelBase, Lambda
 
 
 class BasicBlock(nn.Module):
@@ -166,6 +167,39 @@ class ResNet(nn.Module):
         else:
             raise NotImplementedError()
         return pre
+    
+    def forward_stem(self, x):
+        return self.bn1(self.conv1(x))
+
+    def get_layers(self):
+        select_fn = Lambda(lambda x: x[1])
+        return nn.Sequential(
+            nn.Sequential(
+                nn.Sequential(
+                    self.layer1(x),
+                    select_fn,
+                ),
+                nn.Sequential(
+                    self.layer2(x),
+                    select_fn,
+                ),
+                nn.Sequential(
+                    self.layer3(x),
+                    select_fn,
+                ),
+                nn.Sequential(
+                    self.layer4(x),
+                    select_fn,
+                ),
+            )
+        )
+
+    def forward_pool(self, x):
+        out = self.avgpool(x)
+        return out.reshape(out.size(0), -1)
+
+    def get_head(self):
+        return self.linear
 
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
@@ -183,8 +217,8 @@ class ResNet(nn.Module):
         out = self.linear(avg)
 
         feats = {}
-        feats["feats"] = [f0, f1, f2, f3, f4]
-        feats["preact_feats"] = [f0, f1_pre, f2_pre, f3_pre, f4_pre]
+        feats["feats"] = [f1, f2, f3, f4]
+        feats["preact_feats"] = [f1_pre, f2_pre, f3_pre, f4_pre]
         feats["pooled_feat"] = avg
 
         return out, feats

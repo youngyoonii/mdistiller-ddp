@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from .._base import ModelBase, Lambda
 
 
 class ShuffleBlock(nn.Module):
@@ -161,6 +162,36 @@ class ShuffleNetV2(nn.Module):
 
     def get_stage_channels(self):
         return [24] + list(self.stage_channels[:-1])
+        
+    def forward_stem(self, x):
+        return self.bn1(self.conv1(x))
+
+    def get_layers(self):
+        select_fn = Lambda(lambda x: x[1])
+        return nn.Sequential(
+            nn.Sequential(
+                nn.Sequential(
+                    self.layer1(x),
+                    select_fn,
+                ),
+                nn.Sequential(
+                    self.layer2(x),
+                    select_fn,
+                ),
+                nn.Sequential(
+                    self.layer3(x),
+                    select_fn,
+                ),
+            )
+        )
+
+    def forward_pool(self, x):
+        out = F.relu(self.bn2(self.conv2(x)))
+        out = F.avg_pool2d(out, 4)
+        return out.reshape(out.size(0), -1)
+
+    def get_head(self):
+        return self.linear
 
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
@@ -180,8 +211,8 @@ class ShuffleNetV2(nn.Module):
         out = self.linear(out)
 
         feats = {}
-        feats["feats"] = [f0, f1, f2, f3]
-        feats["preact_feats"] = [f0, f1_pre, f2_pre, f3_pre]
+        feats["feats"] = [f1, f2, f3]
+        feats["preact_feats"] = [f1_pre, f2_pre, f3_pre]
         feats["pooled_feat"] = f4
 
         return out, feats

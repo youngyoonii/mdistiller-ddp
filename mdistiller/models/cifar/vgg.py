@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+from .._base import ModelBase
 
 
 __all__ = [
@@ -67,6 +68,36 @@ class VGG(nn.Module):
 
     def get_stage_channels(self):
         return self.stage_channels
+    
+    def forward_stem(self, x):
+        return self.block0(x)
+
+    def get_layers(self):
+        return nn.Sequential(
+            nn.Sequential(
+                self.pool0,
+                self.block1,
+            ),
+            nn.Sequential(
+                self.pool1,
+                self.block2,
+            ),
+            nn.Sequential(
+                self.pool2,
+                self.block3,
+            ),
+            nn.Sequential(
+                self.pool3,
+                self.block4,
+            ),
+        )
+
+    def forward_pool(self, x):
+        x = self.pool4(x)
+        return x.reshape(x.size(0), -1)
+
+    def get_head(self):
+        return self.classifier
 
     def forward(self, x):
         h = x.shape[2]
@@ -99,8 +130,8 @@ class VGG(nn.Module):
         x = self.classifier(x)
 
         feats = {}
-        feats["feats"] = [f0, f1, f2, f3, f4]
-        feats["preact_feats"] = [f0, f1_pre, f2_pre, f3_pre, f4_pre]
+        feats["feats"] = [f1, f2, f3, f4]
+        feats["preact_feats"] = [f1_pre, f2_pre, f3_pre, f4_pre]
         feats["pooled_feat"] = f5
 
         return x, feats

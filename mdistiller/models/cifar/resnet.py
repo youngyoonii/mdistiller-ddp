@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import torch.nn as nn
 import torch.nn.functional as F
+from .._base import ModelBase, Lambda
 
 
 __all__ = ["resnet"]
@@ -93,7 +94,7 @@ class Bottleneck(nn.Module):
             return out
 
 
-class ResNet(nn.Module):
+class ResNet(nn.Module, ModelBase):
     def __init__(self, depth, num_filters, block_name="BasicBlock", num_classes=10):
         super(ResNet, self).__init__()
         # Model type specifies number of layers for CIFAR-10 model
@@ -180,6 +181,37 @@ class ResNet(nn.Module):
 
     def get_stage_channels(self):
         return self.stage_channels
+    
+    def forward_stem(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        return x
+
+    def get_layers(self):
+        select_fn = Lambda(lambda x: x[1])
+        return nn.Sequential(
+            nn.Sequential(
+                nn.Sequential(
+                    self.layer1(x),
+                    select_fn,
+                ),
+                nn.Sequential(
+                    self.layer2(x),
+                    select_fn,
+                ),
+                nn.Sequential(
+                    self.layer3(x),
+                    select_fn,
+                ),
+            )
+        )
+
+    def forward_pool(self, x):
+        x = self.avgpool(x)
+        return x.reshape(x.size(0), -1)
+
+    def get_head(self):
+        return self.fc
 
     def forward(self, x):
         x = self.conv1(x)
@@ -199,8 +231,8 @@ class ResNet(nn.Module):
         out = self.fc(avg)
 
         feats = {}
-        feats["feats"] = [f0, f1, f2, f3]
-        feats["preact_feats"] = [f0, f1_pre, f2_pre, f3_pre]
+        feats["feats"] = [f1, f2, f3]
+        feats["preact_feats"] = [f1_pre, f2_pre, f3_pre]
         feats["pooled_feat"] = avg
 
         return out, feats
