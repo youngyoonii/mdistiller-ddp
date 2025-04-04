@@ -1,6 +1,7 @@
 import os
 import time
 from tqdm import tqdm
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.distributed as dist
@@ -19,6 +20,18 @@ from .utils import (
 )
 from .dot import DistillationOrientedTrainer
 from ..utils import dist_fn
+
+
+def update_loss_meters(
+    loss_meters: dict[str, AverageMeter],
+    losses_dict: dict[str, torch.Tensor],
+    batch_size: int,
+):
+    for k, v in losses_dict.items():
+        if k not in loss_meters:
+            loss_meters[k] = AverageMeter()
+        loss_meters[k].update(v, batch_size)
+    return loss_meters
 
 
 class BaseTrainer(object):
@@ -57,7 +70,11 @@ class BaseTrainer(object):
     def log(self, lr, epoch, log_dict):
         # tensorboard log
         for k, v in log_dict.items():
-            self.tf_writer.add_scalar(k, v, epoch)
+            if isinstance(v, dict):
+                for name, value in v.items():
+                    self.tf_writer.add_scalar(f'{k}/{name}', value, epoch)
+            else:
+                self.tf_writer.add_scalar(k, v, epoch)
         self.tf_writer.flush()
         # wandb log
         if self.cfg.LOG.WANDB:
@@ -72,21 +89,39 @@ class BaseTrainer(object):
         # worklog.txt
         with open(os.path.join(self.log_path, "worklog.txt"), "a") as writer:
             lines = [
-                "-" * 25 + os.linesep,
+                "-" * 35 + os.linesep,
                 "epoch: {}".format(epoch) + os.linesep,
-                "lr: {:.2f}".format(float(lr)) + os.linesep,
+                "lr: {:.4f}".format(float(lr)) + os.linesep,
             ]
             for k, v in log_dict.items():
-                lines.append("{}: {:.2f}".format(k, v) + os.linesep)
-            lines.append("-" * 25 + os.linesep)
+                match v:
+                    case int():
+                        lines.append("{}: {:d}".format(k, v) + os.linesep)
+                    case float() | np.ndarray() | torch.Tensor():
+                        lines.append("{}: {:.4f}".format(k, v) + os.linesep)
+                    case dict():
+                        lines.append('{}:'.format(k) + os.linesep)
+                        for name, value in v.items():
+                            lines.append("    {}: {:.4f}".format(name, value) + os.linesep)
+            lines.append("-" * 35 + os.linesep)
             writer.writelines(lines)
         # worklog.yaml
         with open(os.path.join(self.log_path, 'worklog.yaml'), 'a') as writer:
             lines = [
-                '- ' + lines[1],
-                *['  ' + line for line in lines[2:-1]],
-                '\n',
+                f'- epoch: {epoch}{os.linesep}',
+                f'  lr: {float(lr):.4f}{os.linesep}',
             ]
+            for k, v in log_dict.items():
+                match v:
+                    case int():
+                        lines.append(f"  {k}: {v:d}{os.linesep}")
+                    case float() | np.ndarray() | torch.Tensor():
+                        lines.append(f"  {k}: {v:.4f}{os.linesep}")
+                    case dict():
+                        lines.append(f'  {k}:{os.linesep}')
+                        for name, value in v.items():
+                            lines.append(f"    {name}: {value:.4f}{os.linesep}")
+            lines.append('\n')
             writer.writelines(lines)
 
     def train(self, resume=False):
@@ -113,7 +148,7 @@ class BaseTrainer(object):
         train_meters = {
             "training_time": AverageMeter(),
             "data_time": AverageMeter(),
-            "losses": AverageMeter(),
+            "losses": dict(),
             "top1": AverageMeter(),
             "top5": AverageMeter(),
         }
@@ -140,7 +175,10 @@ class BaseTrainer(object):
             log_dict = OrderedDict(
                 {
                     "train_acc": train_meters["top1"].avg,
-                    "train_loss": train_meters["losses"].avg,
+                    "train_loss": {
+                        k.replace('loss_', ''): v.avg
+                        for k, v in train_meters["losses"].items()
+                    },
                     "test_acc": test_acc,
                     "test_acc_top5": test_acc_top5,
                     "test_loss": test_loss,
@@ -197,10 +235,15 @@ class BaseTrainer(object):
         preds_all = dist_fn.gather(preds)
         target_all = dist_fn.gather(target)
         loss = dist_fn.reduce(loss, dist.ReduceOp.AVG)
+        losses_dict = {
+            k: dist_fn.reduce(v, dist.ReduceOp.AVG).cpu().detach().numpy().mean()
+            for k, v in losses_dict.items()
+        }
+        losses_dict['_total'] = loss.cpu().detach().numpy().mean()
             
         batch_size = len(preds_all)
         acc1, acc5 = accuracy(preds_all, target_all, topk=(1, 5))
-        train_meters["losses"].update(loss.cpu().detach().numpy().mean(), batch_size)
+        update_loss_meters(train_meters["losses"], losses_dict, batch_size)
         train_meters["top1"].update(acc1[0], batch_size)
         train_meters["top5"].update(acc5[0], batch_size)
             
@@ -209,7 +252,7 @@ class BaseTrainer(object):
             epoch,
             train_meters["data_time"].avg,
             train_meters["training_time"].avg,
-            train_meters["losses"].avg,
+            train_meters["losses"]['_total'].avg,
             train_meters["top1"].avg,
             train_meters["top5"].avg,
         )
@@ -243,10 +286,15 @@ class CRDTrainer(BaseTrainer):
         preds_all = dist_fn.gather(preds)
         target_all = dist_fn.gather(target)
         loss = dist_fn.reduce(loss, dist.ReduceOp.AVG)
+        losses_dict = {
+            k: dist_fn.reduce(v, dist.ReduceOp.AVG).cpu().detach().numpy().mean()
+            for k, v in losses_dict.items()
+        }
+        losses_dict['_total'] = loss.cpu().detach().numpy().mean()
         
         batch_size = len(preds_all)
         acc1, acc5 = accuracy(preds_all, target_all, topk=(1, 5))
-        train_meters["losses"].update(loss.cpu().detach().numpy().mean(), batch_size)
+        update_loss_meters(train_meters["losses"], losses_dict, batch_size)
         train_meters["top1"].update(acc1[0], batch_size)
         train_meters["top5"].update(acc5[0], batch_size)
         
@@ -255,7 +303,7 @@ class CRDTrainer(BaseTrainer):
             epoch,
             train_meters["data_time"].avg,
             train_meters["training_time"].avg,
-            train_meters["losses"].avg,
+            train_meters["losses"]['_total'].avg,
             train_meters["top1"].avg,
             train_meters["top5"].avg,
         )
@@ -325,10 +373,15 @@ class DOT(BaseTrainer):
         target_all = dist_fn.gather(target)
         loss_ce = dist_fn.reduce(loss_ce, dist.ReduceOp.AVG)
         loss_kd = dist_fn.reduce(loss_kd, dist.ReduceOp.AVG)
+        losses_dict = {
+            k: dist_fn.reduce(v, dist.ReduceOp.AVG).cpu().detach().numpy().mean()
+            for k, v in losses_dict.items()
+        }
+        losses_dict['_total'] = (loss_kd + loss_ce).cpu().detach().numpy().mean()
         
         batch_size = len(preds_all)
         acc1, acc5 = accuracy(preds_all, target_all, topk=(1, 5))
-        train_meters["losses"].update((loss_ce + loss_kd).cpu().detach().numpy().mean(), batch_size)
+        update_loss_meters(train_meters["losses"], losses_dict, batch_size)
         train_meters["top1"].update(acc1[0], batch_size)
         train_meters["top5"].update(acc5[0], batch_size)
         
@@ -337,7 +390,7 @@ class DOT(BaseTrainer):
             epoch,
             train_meters["data_time"].avg,
             train_meters["training_time"].avg,
-            train_meters["losses"].avg,
+            train_meters["losses"]['_total'].avg,
             train_meters["top1"].avg,
             train_meters["top5"].avg,
         )
@@ -412,10 +465,15 @@ class CRDDOT(BaseTrainer):
         target_all = dist_fn.gather(target)
         loss_ce = dist_fn.reduce(loss_ce, dist.ReduceOp.AVG)
         loss_kd = dist_fn.reduce(loss_kd, dist.ReduceOp.AVG)
+        losses_dict = {
+            k: dist_fn.reduce(v, dist.ReduceOp.AVG).cpu().detach().numpy().mean()
+            for k, v in losses_dict.items()
+        }
+        losses_dict['_total'] = (loss_ce + loss_kd).cpu().detach().numpy().mean()
         
         batch_size = len(preds_all)
         acc1, acc5 = accuracy(preds_all, target_all, topk=(1, 5))
-        train_meters["losses"].update((loss_ce + loss_kd).cpu().detach().numpy().mean(), batch_size)
+        update_loss_meters(train_meters["losses"], losses_dict, batch_size)
         train_meters["top1"].update(acc1[0], batch_size)
         train_meters["top5"].update(acc5[0], batch_size)
         
@@ -424,7 +482,7 @@ class CRDDOT(BaseTrainer):
             epoch,
             train_meters["data_time"].avg,
             train_meters["training_time"].avg,
-            train_meters["losses"].avg,
+            train_meters["losses"]['_total'].avg,
             train_meters["top1"].avg,
             train_meters["top5"].avg,
         )
