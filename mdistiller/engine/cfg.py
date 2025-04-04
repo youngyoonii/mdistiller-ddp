@@ -2,16 +2,25 @@ from yacs.config import CfgNode as CN
 from .utils import log_msg
 
 
-def show_cfg(cfg):
-    dump_cfg = CN()
-    dump_cfg.EXPERIMENT = cfg.EXPERIMENT
-    dump_cfg.DATASET = cfg.DATASET
-    dump_cfg.DISTILLER = cfg.DISTILLER
-    dump_cfg.SOLVER = cfg.SOLVER
-    dump_cfg.LOG = cfg.LOG
-    if cfg.DISTILLER.TYPE in cfg:
-        dump_cfg.update({cfg.DISTILLER.TYPE: cfg.get(cfg.DISTILLER.TYPE)})
-    print(log_msg("CONFIG:\n{}".format(dump_cfg.dump()), "INFO"))
+def dump_cfg(cfg, show: bool=False):
+    dump = CN()
+    dump.EXPERIMENT = cfg.EXPERIMENT
+    dump.DATASET = cfg.DATASET
+    dump.DISTILLER = cfg.DISTILLER
+    dump.SOLVER = cfg.SOLVER
+    dump.LOG = cfg.LOG
+    
+    if cfg.DISTILLER.TYPE.startswith('SRMD.'):
+        dump.SRMD = cfg.SRMD
+        distiller_type = cfg.DISTILLER.TYPE[5:]
+    else:
+        distiller_type = cfg.DISTILLER.TYPE
+    if distiller_type in cfg:
+        dump.update({distiller_type: cfg.get(distiller_type)})
+    
+    if show:
+        print(log_msg("CONFIG:\n{}".format(dump.dump()), "INFO"))
+    return dump
 
 
 CFG = CN()

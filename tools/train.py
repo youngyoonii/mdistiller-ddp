@@ -13,7 +13,7 @@ from mdistiller.distillers import distiller_dict
 from mdistiller.dataset import get_dataset
 from mdistiller.engine.utils import load_checkpoint, log_msg
 from mdistiller.engine.cfg import CFG as cfg
-from mdistiller.engine.cfg import show_cfg
+from mdistiller.engine.cfg import dump_cfg
 from mdistiller.engine import trainer_dict
 
 
@@ -41,7 +41,7 @@ def main(cfg, resume, opts):
 
     # cfg & loggers
     if IS_MASTER:
-        show_cfg(cfg)
+        dump_cfg(cfg, show=True)
     # init dataloader & models
     train_loader, val_loader, num_data, num_classes = get_dataset(cfg)
 

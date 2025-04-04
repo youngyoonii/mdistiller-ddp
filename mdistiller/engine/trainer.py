@@ -1,4 +1,6 @@
 import os
+from glob import glob
+import shutil
 import time
 from tqdm import tqdm
 import numpy as np
@@ -20,6 +22,7 @@ from .utils import (
 )
 from .dot import DistillationOrientedTrainer
 from ..utils import dist_fn
+from ..engine.cfg import dump_cfg
 
 
 def update_loss_meters(
@@ -54,6 +57,22 @@ class BaseTrainer(object):
             self.tf_writer = SummaryWriter(os.path.join(self.log_path, "train.events"))
         else:
             self.tf_writer = None
+        
+        # dump config and distiller code
+        code_path = os.path.join(self.log_path, 'code')
+        os.makedirs(code_path, exist_ok=True)
+        with open(os.path.join(code_path, '_cfg.yaml'), 'w') as file:
+            cfg_dump = dump_cfg(cfg, show=False)
+            print(cfg_dump, end='', file=file)
+        
+        distiller_names = glob(f'./mdistiller/distillers/**/*.py', recursive=True)
+        target_name = './mdistiller/distillers/' + cfg.DISTILLER.TYPE.replace('.', os.sep).lower() + '.py'
+        distiller_name = None
+        for fname in distiller_names:
+            if target_name == fname.lower():
+                distiller_name = fname
+                break
+        shutil.copyfile(distiller_name, os.path.join(code_path, f'distiller.py'))
 
     def init_optimizer(self, cfg):
         if cfg.SOLVER.TYPE == "SGD":
