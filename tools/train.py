@@ -125,5 +125,9 @@ if __name__ == "__main__":
     
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
     torch.cuda.set_device(rank)
-    main(cfg, args.resume, args.opts)
-    dist.destroy_process_group()
+    try:
+        main(cfg, args.resume, args.opts)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        dist.destroy_process_group()
