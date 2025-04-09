@@ -1,6 +1,7 @@
 import os
 from glob import glob
 import shutil
+import contextlib
 import time
 from tqdm import tqdm
 import numpy as np
@@ -8,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.distributed as dist
 import torch.optim as optim
+import torch.amp as amp
 from collections import OrderedDict
 import getpass
 from tensorboardX import SummaryWriter
@@ -73,6 +75,10 @@ class BaseTrainer(object):
                 distiller_name = fname
                 break
         shutil.copyfile(distiller_name, os.path.join(code_path, f'distiller.py'))
+        
+        self.use_amp = cfg.EXPERIMENT.AMP
+        self.amp_scaler = amp.GradScaler('cuda') if self.use_amp else None
+        self.grad_clip = cfg.SOLVER.GRAD_CLIP
 
     def init_optimizer(self, cfg):
         if cfg.SOLVER.TYPE == "SGD":
@@ -242,12 +248,12 @@ class BaseTrainer(object):
         index = index.cuda(non_blocking=True)
 
         # forward
-        preds, losses_dict = self.distiller(image=image, target=target, epoch=epoch)
+        with amp.autocast('cuda') if self.use_amp else contextlib.nullcontext():
+            preds, losses_dict = self.distiller(image=image, target=target, epoch=epoch)
+            loss: torch.Tensor = sum(losses_dict.values())
 
         # backward
-        loss: torch.Tensor = sum(losses_dict.values())
-        loss.backward()
-        self.optimizer.step()
+        self.backward_loss(loss)
         train_meters["training_time"].update(time.time() - train_start_time)
             
         # collect info
@@ -276,6 +282,26 @@ class BaseTrainer(object):
             train_meters["top5"].avg,
         )
         return msg
+    
+    def backward_loss(self, loss: torch.Tensor):
+        if self.use_amp:
+            self.amp_scaler.scale(loss).backward()
+            if self.grad_clip > 0:
+                self.amp_scaler.unscale_(self.optimizer)
+                nn.utils.clip_grad_norm_(
+                    self.distiller.module.get_learnable_parameters(), 
+                    self.grad_clip
+                )
+            self.amp_scaler.step(self.optimizer)
+            self.amp_scaler.update()
+        else:
+            loss.backward()
+            if self.grad_clip > 0:
+                nn.utils.clip_grad_norm_(
+                    self.distiller.module.get_learnable_parameters(), 
+                    self.grad_clip
+                )
+            self.optimizer.step()
 
 
 class CRDTrainer(BaseTrainer):
@@ -291,14 +317,14 @@ class CRDTrainer(BaseTrainer):
         contrastive_index = contrastive_index.cuda(non_blocking=True)
 
         # forward
-        preds, losses_dict = self.distiller(
-            image=image, target=target, index=index, contrastive_index=contrastive_index
-        )
+        with amp.autocast('cuda') if self.use_amp else contextlib.nullcontext():
+            preds, losses_dict = self.distiller(
+                image=image, target=target, index=index, contrastive_index=contrastive_index
+            )
+            loss: torch.Tensor = sum(losses_dict.values())
 
         # backward
-        loss: torch.Tensor = sum(losses_dict.values())
-        loss.backward()
-        self.optimizer.step()
+        self.backward_loss(loss)
         train_meters["training_time"].update(time.time() - train_start_time)
         
         # collect info
@@ -331,6 +357,8 @@ class CRDTrainer(BaseTrainer):
 
 class DOT(BaseTrainer):
     def init_optimizer(self, cfg):
+        if self.use_amp:
+            raise NotImplementedError('AMP is not supported for DOT.') 
         if cfg.SOLVER.TYPE == "SGD":
             m_task = cfg.SOLVER.MOMENTUM - cfg.SOLVER.DOT.DELTA
             m_kd = cfg.SOLVER.MOMENTUM + cfg.SOLVER.DOT.DELTA
@@ -419,6 +447,8 @@ class DOT(BaseTrainer):
 class CRDDOT(BaseTrainer):
 
     def init_optimizer(self, cfg):
+        if self.use_amp:
+            raise NotImplementedError('AMP is not supported for DOT.') 
         if cfg.SOLVER.TYPE == "SGD":
             m_task = cfg.SOLVER.MOMENTUM - cfg.SOLVER.DOT.DELTA
             m_kd = cfg.SOLVER.MOMENTUM + cfg.SOLVER.DOT.DELTA
