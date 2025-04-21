@@ -81,15 +81,32 @@ class BaseTrainer(object):
         self.grad_clip = cfg.SOLVER.GRAD_CLIP
 
     def init_optimizer(self, cfg):
-        if cfg.SOLVER.TYPE == "SGD":
-            optimizer = optim.SGD(
-                self.distiller.module.get_learnable_parameters(),
-                lr=cfg.SOLVER.LR,
-                momentum=cfg.SOLVER.MOMENTUM,
-                weight_decay=cfg.SOLVER.WEIGHT_DECAY,
-            )
-        else:
-            raise NotImplementedError(cfg.SOLVER.TYPE)
+        match cfg.SOLVER.TYPE:
+            case 'SGD':
+                optimizer = optim.SGD(
+                    self.distiller.module.get_learnable_parameters(),
+                    lr=cfg.SOLVER.LR,
+                    momentum=cfg.SOLVER.SGD.MOMENTUM,
+                    weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+                )
+            case 'Adam':
+                optimizer = optim.Adam(
+                    self.distiller.module.get_learnable_parameters(),
+                    lr=cfg.SOLVER.LR,
+                    betas=cfg.SOLVER.ADAM.BETAS,
+                    eps=cfg.SOLVER.ADAM.EPSILON,
+                    weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+                )
+            case 'AdamW':
+                optimizer = optim.AdamW(
+                    self.distiller.module.get_learnable_parameters(),
+                    lr=cfg.SOLVER.LR,
+                    betas=cfg.SOLVER.ADAM.BETAS,
+                    eps=cfg.SOLVER.ADAM.EPSILON,
+                    weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+                )
+            case _:
+                raise NotImplementedError(cfg.SOLVER.TYPE)
         return optimizer
 
     def log(self, lr, epoch, log_dict):
@@ -169,7 +186,6 @@ class BaseTrainer(object):
     def train_epoch(self, epoch):
         IS_MASTER = bool(int(os.environ['IS_MASTER_NODE']))
         
-        lr = adjust_learning_rate(epoch, self.cfg, self.optimizer)
         train_meters = {
             "training_time": AverageMeter(),
             "data_time": AverageMeter(),
@@ -185,6 +201,7 @@ class BaseTrainer(object):
         # train loops
         self.distiller.train()
         for idx, data in enumerate(self.train_loader):
+            lr = adjust_learning_rate(epoch, idx, self.cfg, self.optimizer)
             msg = self.train_iter(data, epoch, train_meters)
             if IS_MASTER:
                 pbar.set_description(log_msg(msg, "TRAIN"))

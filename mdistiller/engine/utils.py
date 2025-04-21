@@ -80,14 +80,46 @@ def log_msg(msg, mode="INFO"):
     return msg
 
 
-def adjust_learning_rate(epoch, cfg, optimizer):
-    steps = np.sum(epoch > np.asarray(cfg.SOLVER.LR_DECAY_STAGES))
-    if steps > 0:
-        new_lr = cfg.SOLVER.LR * (cfg.SOLVER.LR_DECAY_RATE**steps)
-        for param_group in optimizer.param_groups:
-            param_group["lr"] = new_lr
-        return new_lr
-    return cfg.SOLVER.LR
+def adjust_learning_rate(epoch, bidx, cfg, optimizer):
+    match cfg.SOLVER.SCHEDULE.TYPE:
+        
+        case 'MULTISTEP':
+            if bidx == 0:
+                steps = np.sum(epoch > np.asarray(cfg.SOLVER.SCHEDULE.MULTISTEP.STAGES))
+                if steps > 0:
+                    new_lr = cfg.SOLVER.LR * (cfg.SOLVER.SCHEDULE.MULTISTEP.RATE**steps)
+                    for param_group in optimizer.param_groups:
+                        param_group["lr"] = new_lr
+                    return new_lr
+                return cfg.SOLVER.LR
+            else:
+                return optimizer.param_groups[0]["lr"]
+        
+        case 'COSINE':
+            from math import ceil
+            warmup_epochs = cfg.SOLVER.SCHEDULE.COSINE.WARMUP
+            num_epoch_batches = int(ceil({
+                'imagenet': 1281167,
+                'cifar100': 50000,
+            }[cfg.DATASET.TYPE] / cfg.SOLVER.BATCH_SIZE))
+            num_warmup_batches = num_epoch_batches * warmup_epochs
+            
+            base_lr = cfg.SOLVER.LR
+            global_bidx = (epoch - 1) * num_epoch_batches + bidx
+            if global_bidx < num_warmup_batches:
+                new_lr = base_lr / num_warmup_batches * (global_bidx + 1)
+            else:
+                cos_bidx = global_bidx - num_warmup_batches
+                num_cos_batches = num_epoch_batches * (cfg.SOLVER.EPOCHS - warmup_epochs)
+                last_lr = base_lr * cfg.SOLVER.SCHEDULE.COSINE.RATE
+                new_lr = (np.cos(cos_bidx / num_cos_batches * np.pi) + 1.0) * 0.5 * (base_lr - last_lr) + last_lr
+            
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = new_lr
+            return new_lr
+            
+        case _:
+            raise NotImplementedError(cfg.SOLVER.SCHEDULE.TYPE)
 
 
 def accuracy(output, target, topk=(1,)):
