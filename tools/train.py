@@ -110,12 +110,13 @@ if __name__ == "__main__":
     os.environ['IS_MASTER_NODE'] = str(int(rank == 0))
 
     parser = argparse.ArgumentParser("training for knowledge distillation.")
-    parser.add_argument("--cfg", type=str, default="")
+    parser.add_argument("--cfg", type=str, default=[], nargs='*')
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("opts", default=None, nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
-    cfg.merge_from_file(args.cfg)
+    for cfg_fn in args.cfg:
+        cfg.merge_from_file(cfg_fn)
     cfg.merge_from_list(args.opts)
     cfg.EXPERIMENT.DDP = True
     cfg.DATASET.NUM_WORKERS //= world_size
