@@ -47,7 +47,8 @@ class VisionTransformer(TimmViT, ModelBase):
             drop_path_rate: float = 0.,
             weight_init: Literal['skip', 'jax', 'jax_nlhb', 'moco', ''] = '',
             fix_init: bool = False,
-            embed_layer: function = PatchEmbed,
+            embed_layer = PatchEmbed,
+            # embed_layer: Callable[..., nn.Module] = PatchEmbed,
             embed_norm_layer: LayerType|None = None,
             norm_layer: LayerType|None = None,
             act_layer: LayerType|None = None,
@@ -187,3 +188,19 @@ def vit_large_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransform
     model_args = dict(patch_size=16, embed_dim=1024, depth=24, num_heads=16)
     model = _create_vision_transformer('vit_large_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
     return model
+
+
+def clip_base_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransformer:
+    """ ViT-Base (ViT-B/16) from original paper (https://arxiv.org/abs/2010.11929).
+    ImageNet-1k weights fine-tuned from in21k @ 224x224, source https://github.com/google-research/vision_transformer.
+    """
+    model_args = dict(patch_size=16, embed_dim=768, depth=12, num_heads=12, pre_norm=True)
+    model = _create_vision_transformer('vit_base_patch16_clip_224.laion2b', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
+if __name__ == "__main__":
+    input = torch.randn(1, 3, 224, 224)
+    model = clip_base_patch16_224(pretrained=True)
+    output, feats = model(input)
+
+    # print(feats['feats'][0].shape)

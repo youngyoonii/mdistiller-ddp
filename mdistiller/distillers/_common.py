@@ -29,6 +29,26 @@ class ConvReg(nn.Module):
         else:
             return self.bn(x)
 
+class SimpleAdapter(nn.Module):
+    def __init__(self, s_features, t_features, hidden_features=None, act_layer=nn.GELU, drop=0.):
+        super().__init__()
+        in_features = s_features
+        out_features = t_features       
+        hidden_features = hidden_features or in_features     
+        self.fc1 = nn.Linear(in_features, hidden_features)       # Downconv
+        self.act = act_layer()
+        self.fc2 = nn.Linear(hidden_features, out_features)      # UPconv
+        self.drop = nn.Dropout(drop)
+
+    def forward(self, x, H, W):
+        x = self.fc1(x)            
+        x = self.act(x)            
+        x = self.drop(x)
+        x = self.fc2(x)           
+        x = self.drop(x)   
+        return x
+
+
 
 def get_feat_shapes(student, teacher, input_size):
     data = torch.randn(1, 3, *input_size)
