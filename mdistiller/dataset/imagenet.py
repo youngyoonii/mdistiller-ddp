@@ -66,11 +66,11 @@ class ImageNetInstanceSample(ImageNet):
         else:
             return img, target, index
 
-def get_imagenet_train_transform(mean, std):
+def get_imagenet_train_transform(mean, std, img_size=224):
     normalize = transforms.Normalize(mean=mean, std=std)
     train_transform = transforms.Compose(
         [
-            transforms.RandomResizedCrop(224),
+            transforms.RandomResizedCrop(img_size),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize,
@@ -78,12 +78,12 @@ def get_imagenet_train_transform(mean, std):
     )
     return train_transform
 
-def get_imagenet_test_transform(mean, std):
+def get_imagenet_test_transform(mean, std, resize_size=256, crop_size=224):
     normalize = transforms.Normalize(mean=mean, std=std)
     test_transform = transforms.Compose(
         [
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
+            transforms.Resize(resize_size),
+            transforms.CenterCrop(crop_size),
             transforms.ToTensor(),
             normalize,
         ]
@@ -91,18 +91,18 @@ def get_imagenet_test_transform(mean, std):
     return test_transform
 
 def get_imagenet_dataloaders(batch_size, val_batch_size, num_workers, use_ddp,
-    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]):
-    train_transform = get_imagenet_train_transform(mean, std)
+    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], img_size=224, resize_size=256, crop_size=224):
+    train_transform = get_imagenet_train_transform(mean, std, img_size)
     train_folder = os.path.join(data_folder, 'train')
     train_set = ImageNet(train_folder, transform=train_transform)
     num_data = len(train_set)
     train_loader = make_loader(train_set, batch_size, num_workers, shuffle=True, use_ddp=use_ddp)
-    test_loader = get_imagenet_val_loader(val_batch_size, use_ddp, mean, std)
+    test_loader = get_imagenet_val_loader(val_batch_size, use_ddp, mean, std, resize_size, crop_size)
     return train_loader, test_loader, num_data
 
 def get_imagenet_dataloaders_sample(batch_size, val_batch_size, num_workers, use_ddp, k=4096, 
-    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]):
-    train_transform = get_imagenet_train_transform(mean, std)
+    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], img_size=224):
+    train_transform = get_imagenet_train_transform(mean, std, img_size)
     train_folder = os.path.join(data_folder, 'train')
     train_set = ImageNetInstanceSample(train_folder, transform=train_transform, is_sample=True, k=k)
     num_data = len(train_set)
@@ -110,8 +110,8 @@ def get_imagenet_dataloaders_sample(batch_size, val_batch_size, num_workers, use
     test_loader = get_imagenet_val_loader(val_batch_size, use_ddp, mean, std)
     return train_loader, test_loader, num_data
 
-def get_imagenet_val_loader(val_batch_size, use_ddp, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]):
-    test_transform = get_imagenet_test_transform(mean, std)
+def get_imagenet_val_loader(val_batch_size, use_ddp, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], resize_size=256, crop_size=224):
+    test_transform = get_imagenet_test_transform(mean, std, resize_size, crop_size)
     test_folder = os.path.join(data_folder, 'val')
     test_set = ImageFolder(test_folder, transform=test_transform)
     test_loader = make_loader(test_set, val_batch_size, num_workers=16, shuffle=False, use_ddp=use_ddp)

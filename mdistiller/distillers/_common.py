@@ -35,17 +35,17 @@ class SimpleAdapter(nn.Module):
         in_features = s_features
         out_features = t_features       
         hidden_features = hidden_features or in_features     
-        self.fc1 = nn.Linear(in_features, hidden_features)       # Downconv
-        self.act = act_layer()
-        self.fc2 = nn.Linear(hidden_features, out_features)      # UPconv
-        self.drop = nn.Dropout(drop)
+        self.fc1 = nn.Linear(in_features, out_features)       # Downconv
+        # self.act = act_layer()
+        # self.fc2 = nn.Linear(hidden_features, out_features)      # UPconv
+        # self.drop = nn.Dropout(drop)
 
-    def forward(self, x, H, W):
+    def forward(self, x):
         x = self.fc1(x)            
-        x = self.act(x)            
-        x = self.drop(x)
-        x = self.fc2(x)           
-        x = self.drop(x)   
+        # x = self.act(x)            
+        # x = self.drop(x)
+        # x = self.fc2(x)           
+        # x = self.drop(x)   
         return x
 
 

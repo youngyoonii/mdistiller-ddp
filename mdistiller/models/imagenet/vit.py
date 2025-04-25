@@ -133,6 +133,21 @@ class VisionTransformer(TimmViT, ModelBase):
         x = self.head(x)
         return x, feats
 
+    def forward_partial(self, x: torch.Tensor, end_layer) -> torch.Tensor:
+        x = self.forward_stem(x)
+        feats = {
+            'feats': [],
+            'preact_feats': [],
+            'pooled_feat': None,
+        }
+        for i, block in enumerate(self.blocks):
+            if i > end_layer:
+                return feats
+            else:
+                x = block.forward(x)
+                feats['preact_feats'].append(x)
+                feats['feats'].append(x)
+
 
 def _create_vision_transformer(variant: str, pretrained: bool = False, **kwargs) -> VisionTransformer:
     out_indices = kwargs.pop('out_indices', 3)
@@ -191,16 +206,38 @@ def vit_large_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransform
 
 
 def clip_base_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransformer:
-    """ ViT-Base (ViT-B/16) from original paper (https://arxiv.org/abs/2010.11929).
-    ImageNet-1k weights fine-tuned from in21k @ 224x224, source https://github.com/google-research/vision_transformer.
-    """
+    # clip model params pre_norm=True
     model_args = dict(patch_size=16, embed_dim=768, depth=12, num_heads=12, pre_norm=True)
-    model = _create_vision_transformer('vit_base_patch16_clip_224.laion2b', pretrained=pretrained, **dict(model_args, **kwargs))
+    model = _create_vision_transformer('vit_base_patch16_clip_224.openai_ft_in12k_in1k', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
+# dinov2 
+def dinov2_tiny_patch14_518(pretrained: bool = False, **kwargs) -> VisionTransformer:
+    """ Non-pretrained Dinov2
+    """
+    model_args = dict(patch_size=14, embed_dim=192, depth=12, num_heads=3, init_values=1e-5, img_size=518)
+    model = _create_vision_transformer('vit_tiny_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
+def dinov2_small_patch14_518(pretrained: bool = False, **kwargs):
+    model_args = dict(patch_size=14, embed_dim=384, depth=12, num_heads=6, init_values=1e-5, img_size=518)
+    model = _create_vision_transformer('vit_small_patch14_dinov2.lvd142m', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
+def dinov2_base_patch14_518(pretrained: bool = False, **kwargs):
+    model_args = dict(patch_size=14, embed_dim=768, depth=12, num_heads=12, init_values=1e-5, img_size=518)
+    model = _create_vision_transformer('vit_base_patch14_dinov2.lvd142m', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
+def dinov2_large_patch14_518(pretrained: bool = False, **kwargs):
+    model_args = dict(patch_size=14, embed_dim=1024, depth=24, num_heads=16, init_values=1e-5, img_size=518)
+    model = _create_vision_transformer('vit_large_patch14_dinov2.lvd142m', pretrained=pretrained, **dict(model_args, **kwargs))
     return model
 
 if __name__ == "__main__":
     input = torch.randn(1, 3, 224, 224)
     model = clip_base_patch16_224(pretrained=True)
     output, feats = model(input)
+    print(len(feats))
 
     # print(feats['feats'][0].shape)

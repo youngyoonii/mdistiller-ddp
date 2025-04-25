@@ -5,7 +5,11 @@ from .vit import (
     vit_small_patch16_224,
     vit_base_patch16_224,
     vit_large_patch16_224,
-    clip_base_patch16_224
+    clip_base_patch16_224,
+    dinov2_tiny_patch14_518,
+    dinov2_small_patch14_518,
+    dinov2_base_patch14_518,
+    dinov2_large_patch14_518
 )
 
 
@@ -22,4 +26,8 @@ imagenet_model_dict = {
     "vit_base.unic": vit_base_patch16_224,
     "vit_large": vit_large_patch16_224,
     "clip_base": clip_base_patch16_224,
+    "dinov2_tiny": dinov2_tiny_patch14_518,
+    "dinov2_small": dinov2_small_patch14_518,
+    "dinov2_base": dinov2_base_patch14_518,
+    "dinov2_large": dinov2_large_patch14_518,
 }

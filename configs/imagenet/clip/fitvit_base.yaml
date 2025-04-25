@@ -1,7 +1,7 @@
 EXPERIMENT:
-  NAME: "layer_9"
-  TAG: "fitvit,clip-base,vit-tiny"
-  PROJECT: "CLIP_imagenet_base"
+  NAME: ""
+  TAG: "fitvit-baseline,clip-base,vit-tiny,weight-100.0"
+  PROJECT: "CLIP_FitViT"
 DATASET:
   TYPE: "imagenet"
   NUM_WORKERS: 32
@@ -27,9 +27,11 @@ FITNET:
   INPUT_SIZE: [224, 224]
   HINT_LAYER: 7
   LOSS:
-    FEAT_WEIGHT: 1.0
+    FEAT_WEIGHT: 100.0
 LOG:
   TENSORBOARD_FREQ: 50
   SAVE_CHECKPOINT_FREQ: 10
+AF:
+  ENABLE: False
 # FITNET:
 #   HINT_LAYER: 8

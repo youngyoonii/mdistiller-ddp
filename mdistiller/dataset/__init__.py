@@ -34,12 +34,20 @@ def get_dataset(cfg):
                 use_ddp=use_ddp,
             )
         else:
-            train_loader, val_loader, num_data = get_imagenet_dataloaders(
-                batch_size=cfg.SOLVER.BATCH_SIZE,
-                val_batch_size=cfg.DATASET.TEST.BATCH_SIZE,
-                num_workers=cfg.DATASET.NUM_WORKERS,
-                use_ddp=use_ddp,
-            )
+            if 'dinov2' in cfg.DISTILLER.TEACHER:
+                    train_loader, val_loader, num_data = get_imagenet_dataloaders(
+                    batch_size=cfg.SOLVER.BATCH_SIZE,
+                    val_batch_size=cfg.DATASET.TEST.BATCH_SIZE,
+                    num_workers=cfg.DATASET.NUM_WORKERS,
+                    use_ddp=use_ddp, img_size=518, resize_size=518, crop_size=518
+                )
+            else:
+                train_loader, val_loader, num_data = get_imagenet_dataloaders(
+                    batch_size=cfg.SOLVER.BATCH_SIZE,
+                    val_batch_size=cfg.DATASET.TEST.BATCH_SIZE,
+                    num_workers=cfg.DATASET.NUM_WORKERS,
+                    use_ddp=use_ddp,
+                )
         num_classes = 1000
     elif cfg.DATASET.TYPE == "tiny_imagenet":
         if cfg.DISTILLER.TYPE in ("CRD", "CRDKD"):
