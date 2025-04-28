@@ -1,6 +1,6 @@
 EXPERIMENT:
   NAME: ""
-  TAG: "fitvit-remove,clip-base,vit-tiny,weight-100.0"
+  TAG: "fitvit-remove,clip-base,vit-tiny,weight-100.0,layer11"
   PROJECT: "CLIP_FitViT"
 DATASET:
   TYPE: "imagenet"
@@ -25,7 +25,7 @@ SOLVER:
   TYPE: "SGD"
 FITNET:
   INPUT_SIZE: [224, 224]
-  HINT_LAYER: 7
+  HINT_LAYER: 11
   LOSS:
     FEAT_WEIGHT: 100.0
 LOG:
@@ -33,5 +33,3 @@ LOG:
   SAVE_CHECKPOINT_FREQ: 10
 AF:
   ENABLE: True
-# FITNET:
-#   HINT_LAYER: 8

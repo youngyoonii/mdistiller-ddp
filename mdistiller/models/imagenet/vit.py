@@ -147,6 +147,8 @@ class VisionTransformer(TimmViT, ModelBase):
                 x = block.forward(x)
                 feats['preact_feats'].append(x)
                 feats['feats'].append(x)
+        
+        return feats
 
 
 def _create_vision_transformer(variant: str, pretrained: bool = False, **kwargs) -> VisionTransformer:
