@@ -10,24 +10,37 @@ from torch.optim import lr_scheduler
 from mdistiller.dataset.nyud_v2 import get_nyud_dataloaders
 from mdistiller.models._base import ModelBase
 
-from tools.lineval.utils import init_parser, load_from_checkpoint
+from tools.lineval.utils import (
+    init_parser,
+    prepare_lineval_dir,
+    load_from_checkpoint,
+)
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser('lineval.imagenet')
-    init_parser(parser, defaults=dict(epochs=5000))
+    parser = ArgumentParser('lineval.nyud')
+    init_parser(parser)
     args = parser.parse_args()
     
     DEVICE = args.device
     EPOCHS = args.epochs
     
+    log_dir, log_filename, best_filename, last_filename = prepare_lineval_dir(
+        args.expname, 
+        tag=args.tag, 
+        dataset='imagenet', 
+        args=vars(args)
+    )
+    print(log_dir)
+    
+    # DataLoaders, Models
     train_loader, test_loader, _ = get_nyud_dataloaders(
         args.batch_size, args.test_batch_size,
         args.num_workers, use_ddp=False,
     )
-    model, _ = load_from_checkpoint(args.expname, tag=args.tag, expected_arch='transformer')
+    model, _ = load_from_checkpoint(args.expname, tag=args.tag)
     model: ModelBase = model.cuda(DEVICE)
-    head = torch.nn.Linear(model.embed_dim, 768).cuda(DEVICE)
+    head = torch.nn.Linear(model.embed_dim, 256).cuda(DEVICE)
     optimizer = optim.SGD(
         head.parameters(),
         lr=args.learning_rate,
@@ -39,20 +52,25 @@ if __name__ == '__main__':
         eta_min=1.0E-8,
     )
     
+    # Utility
     def patches_to_depth(x: torch.Tensor):
         _, num_patches, embed_dim = x.shape
         patch_rows = int(num_patches**0.5)
         pixel_rows = int(embed_dim**0.5)
         return einops.rearrange(
-            x, 'b (ph pw) (h w) -> b (ph h) (pw w)',
+            x[:, -patch_rows*patch_rows:],
+            'b (ph pw) (h w) -> b (ph h) (pw w)',
             ph=patch_rows, pw=patch_rows,
             h=pixel_rows, w=pixel_rows,
         )
     
+    # Training Loop
+    best_rmse = torch.inf
+    train_loss_list, train_rmse_list, test_loss_list, test_rmse_list = [], [], [], []
     for epoch in range(args.epochs):
         
         with tqdm(train_loader, desc=f'TRAIN {epoch+1}', dynamic_ncols=True) as bar:
-            total_loss, correct, total = 0, 0, 0
+            total_loss, total_rmse, total = 0, 0, 0
             for input, target in bar:
                 with torch.no_grad():
                     x = model.forward_stem(input.cuda(DEVICE))
@@ -68,16 +86,19 @@ if __name__ == '__main__':
                 
                 batch_size = input.size(0)
                 total_loss += loss.clone().detach().cpu().item() * batch_size
-                correct += (pred == target).sum().item()
+                total_rmse += torch.square(pred - target.to(DEVICE)).flatten(1) \
+                    .mean(dim=1).sqrt().sum().clone().detach().cpu().item()
                 total += batch_size
                 bar.set_postfix(dict(
-                    top1=correct/total*100,
                     loss=total_loss/total,
+                    rmse=total_rmse/total,
                     lr=optimizer.param_groups[0]['lr'],
                 ))
+            train_rmse = total_rmse / total
+            train_loss = total_loss / total
 
         with tqdm(test_loader, desc=f' TEST {epoch+1}', dynamic_ncols=True) as bar, torch.no_grad():
-            total_loss, correct, total = 0, 0, 0
+            total_loss, total = 0, 0
             for input, target in bar:
                 x = model.forward_stem(input.cuda(DEVICE))
                 x = model.get_layers().forward(x)
@@ -87,9 +108,42 @@ if __name__ == '__main__':
                 
                 batch_size = input.size(0)
                 total_loss += loss.cpu().item() * batch_size
-                correct += (pred == target).sum().item()
+                total_rmse += torch.square(pred - target.to(DEVICE)).flatten(1) \
+                    .mean(dim=1).sqrt().sum().cpu().item()
                 total += batch_size
                 bar.set_postfix(dict(
-                    top1=correct/total*100,
                     loss=total_loss/total,
+                    rmse=total_rmse/total,
                 ))
+            test_rmse = total_rmse / total
+            test_loss = total_loss / total
+        
+        # Logging
+        train_loss_list.append(train_loss)
+        train_rmse_list.append(train_rmse)
+        test_loss_list.append(test_loss)
+        test_rmse_list.append(test_rmse)
+        
+        with open(log_filename, 'a') as file:
+            print(f'- epoch: {epoch+1}', file=file)
+            print(f'  train_loss: {train_loss:.4f}', file=file)
+            print(f'  train_rmse: {train_rmse:.4f}', file=file)
+            print(f'  test_loss: {test_loss:.4f}', file=file)
+            print(f'  test_rmse: {test_rmse:.4f}', file=file)
+            print(file=file)
+        
+        ckpt = dict(
+            epoch=epoch+1,
+            train_loss=train_loss_list,
+            train_rmse=train_rmse_list,
+            test_loss=test_loss_list,
+            test_rmse=test_rmse_list,
+            head={
+                key: val.clone().detach().cpu()
+                for key, val in head.state_dict().items()
+            },
+        )
+        if test_rmse > best_rmse:
+            best_rmse = test_rmse
+            torch.save(ckpt, str(best_filename))
+        torch.save(ckpt, str(last_filename))

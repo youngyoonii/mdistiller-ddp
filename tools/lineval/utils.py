@@ -1,10 +1,46 @@
 import os
+from datetime import datetime
 from argparse import ArgumentParser
 from typing import Literal
+from pathlib import Path
 from yacs.config import CfgNode as CN
 import torch
 from mdistiller.models.imagenet import imagenet_model_dict
 
+def get_config(
+    exp_name: str,
+    ckpt_tag: Literal['latest', 'best']|int|None=None,
+):
+    exp_root = os.path.join('output', exp_name)
+    with open(os.path.join(exp_root, 'code', '_cfg.yaml'), 'r') as file:
+        cfg = CN.load_cfg(file)
+    if ckpt_tag is None:
+        return cfg
+    else:
+        ckpt = torch.load(os.path.join(exp_root, f'student_{ckpt_tag}'), map_location='cpu', weights_only=False)
+        return cfg, ckpt
+
+def prepare_lineval_dir(
+    exp_name: str,
+    tag: Literal['latest', 'best']|int='latest',
+    dataset: str='imagenet',
+    args: dict|None=None,
+):
+    lineval_dir = Path('output').joinpath(exp_name, 'lineval')
+    nowstr = datetime.now().strftime('_%y%m%d_%H%M%S')
+    log_dir = lineval_dir.joinpath(tag, dataset + nowstr)
+    log_dir.mkdir(parents=True)
+    
+    if args is not None:
+        cfg_filename = log_dir.joinpath('_cfg.yaml')
+        with open(cfg_filename, 'w') as file:
+            for key, val in args.items():
+                print(f'{key}: {val}', file=file)
+    
+    log_filename = log_dir.joinpath('log.yaml')
+    best_filename = log_dir.joinpath('best.pt')
+    last_filename = log_dir.joinpath('last.pt')
+    return log_dir, log_filename, best_filename, last_filename
 
 def load_from_checkpoint(
     exp_name: str,
@@ -21,11 +57,7 @@ def load_from_checkpoint(
         model, load_state_dict_result = checkpoint
         ```
     '''
-    exp_root = os.path.join('output', exp_name)
-    with open(os.path.join(exp_root, 'code', '_cfg.yaml'), 'r') as file:
-        cfg = CN.load_cfg(file)
-    ckpt = torch.load(os.path.join(exp_root, f'student_{tag}'), map_location='cpu', weights_only=False)
-    
+    cfg, ckpt = get_config(exp_name, ckpt_tag=tag)
     model: torch.nn.Module = imagenet_model_dict[cfg.DISTILLER.STUDENT](pretrained=False)
     if (expected_arch is not None) and (model.get_arch() != expected_arch):
         raise ValueError(f'Expected {expected_arch}, but this checkpoint requires {model.get_arch()}.')
@@ -46,7 +78,7 @@ def T_CHECKPOINT_TAG(tag: str):
         raise ValueError
 
 def init_parser(
-    parser: ArgumentParser, defaults: dict,
+    parser: ArgumentParser, defaults: dict={},
 ) -> ArgumentParser:
     # experiment
     parser.add_argument('expname', type=str)
