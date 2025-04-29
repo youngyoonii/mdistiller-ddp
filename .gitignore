@@ -131,3 +131,4 @@ download_ckpts/
 # Test, temporary
 *temp*
 *recipe*
+mdistiller/models/*/checkpoints
