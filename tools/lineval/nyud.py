@@ -28,7 +28,7 @@ if __name__ == '__main__':
     log_dir, log_filename, best_filename, last_filename = prepare_lineval_dir(
         args.expname, 
         tag=args.tag, 
-        dataset='imagenet', 
+        dataset='nyud', 
         args=vars(args)
     )
     
