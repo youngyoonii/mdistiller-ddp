@@ -150,6 +150,22 @@ class VisionTransformer(TimmViT, ModelBase):
         
         return feats
 
+    def forward_wohead(self, x: torch.Tensor) ->torch.Tensor:
+        """
+        for distillate only feature, do not pass through pooling layer & head
+        """
+        x = self.forward_stem(x)
+        feats = {
+            'feats': [],
+            'preact_feats': [],
+            'pooled_feat': None,
+        }
+        for block in self.blocks:
+            x = block.forward(x)
+            feats['preact_feats'].append(x)
+            feats['feats'].append(x)
+        return x, feats
+
 
 def _create_vision_transformer(variant: str, pretrained: bool = False, **kwargs) -> VisionTransformer:
     out_indices = kwargs.pop('out_indices', 3)
@@ -207,10 +223,16 @@ def vit_large_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransform
     return model
 
 
-def clip_base_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransformer:
+def clip_base_patch16_224_ft_in(pretrained: bool = False, **kwargs) -> VisionTransformer:
     # clip model params pre_norm=True
     model_args = dict(patch_size=16, embed_dim=768, depth=12, num_heads=12, pre_norm=True)
     model = _create_vision_transformer('vit_base_patch16_clip_224.openai_ft_in12k_in1k', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
+def clip_base_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransformer:
+    # clip model params pre_norm=True
+    model_args = dict(patch_size=16, embed_dim=768, depth=12, num_heads=12, pre_norm=True)
+    model = _create_vision_transformer('vit_base_patch16_clip_224.openai', pretrained=pretrained, **dict(model_args, **kwargs))
     return model
 
 # dinov2 

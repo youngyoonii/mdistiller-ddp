@@ -78,12 +78,20 @@ CFG.LOG.WANDB = False
 
 # Distillation Methods
 
-# Artifact Filling
-CFG.AF = CN()
-CFG.AF.ENABLE = False
-CFG.AF.CRITERIA = CN()
-CFG.AF.CRITERIA.TYPE = 'zscore'
-CFG.AF.CRITERIA.THRES = 3.5
+"""Artifact Manipulating Distillation"""
+CFG.AMD = CN()
+CFG.AMD.M_LAYERS = [5] # manipulating layers
+CFG.AMD.ALIGN_TYPE = 'cosine' # 'cosine', 'mse', 'both'
+CFG.AMD.INPUT_SIZE = [224, 224]
+CFG.AMD.AF = CN()
+CFG.AMD.AF.ENABLE = False
+CFG.AMD.AF.CRITERIA = CN()
+CFG.AMD.AF.CRITERIA.TYPE = 'zscore'
+CFG.AMD.AF.CRITERIA.THRES = 3.5
+CFG.AMD.LOSS = CN()
+CFG.AMD.LOSS.ALIGN_WIEGHT = 1.0
+CFG.AMD.LOSS.FEAT_WEIGHT = 100.0
+
 
 # KD CFG
 CFG.KD = CN()
@@ -112,7 +120,7 @@ CFG.RKD.PDIST.SQUARED = False
 
 # FITNET CFG
 CFG.FITNET = CN()
-CFG.FITNET.HINT_LAYER = 5  # (0, 1, 2, 3, 4) fit 
+CFG.FITNET.HINT_LAYER = [5]  # (0, 1, 2, 3, 4) fit 
 CFG.FITNET.INPUT_SIZE = [32, 32]
 CFG.FITNET.LOSS = CN()
 CFG.FITNET.LOSS.CE_WEIGHT = 1.0

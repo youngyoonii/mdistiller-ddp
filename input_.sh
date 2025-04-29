@@ -8,7 +8,9 @@ export CUDA_DEVICE_COUNT=4
 export OMP_NUM_THREADS=4
 torchrun --nproc-per-node=$CUDA_DEVICE_COUNT --master_port=12345  tools/train.py --cfg ./configs/imagenet/clip/fitvit_remove.yaml ./configs/imagenet/optim/adamw.yaml
 
-# TODO: for check
-# baseline: clip_base >> clip_tiny feat_weight 1.0, 5.0, 10.0
+export CUDA_VISIBLE_DEVICES=4,5,6,7
+export CUDA_DEVICE_COUNT=4
+export OMP_NUM_THREADS=4
+torchrun --nproc-per-node=$CUDA_DEVICE_COUNT --master_port=6789  tools/train.py --cfg ./configs/imagenet/clip/AMD.yaml ./configs/imagenet/optim/adamw.yaml
 
 
