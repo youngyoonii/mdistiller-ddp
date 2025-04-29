@@ -5,3 +5,6 @@ yacs
 wandb
 tqdm
 tensorboardX
+mat73
+albumentations
+einops
