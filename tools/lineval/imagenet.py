@@ -28,7 +28,6 @@ if __name__ == '__main__':
         dataset='imagenet', 
         args=vars(args)
     )
-    print(log_dir)
     
     # DataLoaders, Models
     train_loader, test_loader, _ = get_imagenet_dataloaders(
