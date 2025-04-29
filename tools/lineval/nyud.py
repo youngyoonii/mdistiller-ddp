@@ -19,7 +19,7 @@ from tools.lineval.utils import (
 
 if __name__ == '__main__':
     parser = ArgumentParser('lineval.nyud')
-    init_parser(parser)
+    init_parser(parser, defaults=dict(epochs=1000))
     args = parser.parse_args()
     
     DEVICE = args.device
@@ -31,7 +31,6 @@ if __name__ == '__main__':
         dataset='imagenet', 
         args=vars(args)
     )
-    print(log_dir)
     
     # DataLoaders, Models
     train_loader, test_loader, _ = get_nyud_dataloaders(
