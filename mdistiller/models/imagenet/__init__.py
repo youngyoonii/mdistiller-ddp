@@ -7,10 +7,15 @@ from .vit import (
     vit_large_patch16_224,
     clip_base_patch16_224,
     clip_base_patch16_224_ft_in,
+    clip_xsmall_patch16_224,
     dinov2_tiny_patch14_518,
     dinov2_small_patch14_518,
     dinov2_base_patch14_518,
-    dinov2_large_patch14_518
+    dinov2_large_patch14_518,
+    deit3_small_patch16_224,
+    deit3_medium_patch16_224,
+    deit3_base_patch16_224,
+    deit3_large_patch16_224,
 )
 
 
@@ -26,10 +31,17 @@ imagenet_model_dict = {
     "vit_base": vit_base_patch16_224,
     "vit_base.unic": vit_base_patch16_224,
     "vit_large": vit_large_patch16_224,
+
+    "clip_xsmall": clip_xsmall_patch16_224,
     "clip_base": clip_base_patch16_224,
     "clip_base_ft": clip_base_patch16_224_ft_in,
+    
     "dinov2_tiny": dinov2_tiny_patch14_518,
     "dinov2_small": dinov2_small_patch14_518,
     "dinov2_base": dinov2_base_patch14_518,
     "dinov2_large": dinov2_large_patch14_518,
+    "deit3_small": deit3_small_patch16_224,
+    "deit3_medium": deit3_medium_patch16_224,
+    "deit3_base": deit3_base_patch16_224,
+    "deit3_large": deit3_large_patch16_224,
 }

@@ -75,7 +75,6 @@ class AMD(Distiller):
             f_s = self.adapter_dict[f"adapter_{m_l:03d}"](feature_student["feats"][m_l])
             f_t = feature_teacher["feats"][m_l]
             if self.af_enabled:
-                
                 match self.af_type:
                     case 'zscore':
                         outlier_mask = modified_zscore(f_t, threshold=self.af_threshold)

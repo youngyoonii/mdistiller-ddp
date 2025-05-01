@@ -1,7 +1,7 @@
 EXPERIMENT:
   NAME: ""
-  TAG: "AMD,clip-base,vit-tiny,layer7,both"
-  PROJECT: "CLIP_AMD"
+  TAG: "amd-wo-masking,deit3-base,deit3-small,layer7,both"
+  PROJECT: "deit3_baselines"
 DATASET:
   TYPE: "imagenet"
   NUM_WORKERS: 32
@@ -9,15 +9,15 @@ DATASET:
     BATCH_SIZE: 128
 DISTILLER:
   TYPE: "AMD"
-  TEACHER: "clip_base"
-  STUDENT: "vit_tiny"
+  TEACHER: "deit3_base"
+  STUDENT: "deit3_small"
 SOLVER:
   BATCH_SIZE: 512
   EPOCHS: 100
   LR: 0.2
   SGD:
     MOMENTUM: 0.9
-  SCHEDULE:
+  SCHEDULE: 
     MULTISTEP:
       STAGES: [30, 60, 90]
       RATE: 0.1
@@ -29,5 +29,7 @@ LOG:
 AMD:
   M_LAYERS: [7]
   ALIGN_TYPE: 'both'
+  INPUT_SIZE: [224, 224]
   AF:
-    ENABLE: True
+    ENABLE: False
+

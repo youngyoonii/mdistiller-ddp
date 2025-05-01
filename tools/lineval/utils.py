@@ -93,6 +93,9 @@ def init_parser(
     parser.add_argument('--learning-rate', '-lr', type=float, default=0.1)
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--weight-decay', type=float, default=1.0E-6)
+
+    # for load pretrained model from timm
+    parser.add_argument('--timm-model', type=str, default=None)
     
     parser.set_defaults(**defaults)
     return parser

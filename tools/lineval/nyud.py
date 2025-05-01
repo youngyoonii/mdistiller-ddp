@@ -13,6 +13,7 @@ from torchvision.transforms.functional import (
 
 from mdistiller.dataset.nyud_v2 import get_nyud_dataloaders
 from mdistiller.models._base import ModelBase
+from mdistiller.models import imagenet_model_dict
 
 from tools.lineval.utils import (
     init_parser,
@@ -41,7 +42,11 @@ if __name__ == '__main__':
         args.batch_size, args.test_batch_size,
         args.num_workers, use_ddp=False,
     )
-    model, _ = load_from_checkpoint(args.expname, tag=args.tag)
+    if args.timm_model is not None:
+        print(f"Loading {args.timm_model} from timm")
+        model = imagenet_model_dict[args.timm_model](pretrained=True)
+    else:
+        model, _ = load_from_checkpoint(args.expname, tag=args.tag)
     model: ModelBase = model.cuda(DEVICE)
     head = torch.nn.Linear(model.embed_dim, 256).cuda(DEVICE)
     optimizer = optim.SGD(

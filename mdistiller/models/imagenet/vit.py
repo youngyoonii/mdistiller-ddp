@@ -223,6 +223,14 @@ def vit_large_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransform
     return model
 
 
+# CLIP
+def clip_xsmall_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransformer:
+    # TinyCLIP 8M
+    model_args = dict(embed_dim=256, depth=10, num_heads=4, pre_norm=True, norm_layer=nn.LayerNorm)
+    model = _create_vision_transformer(
+        'vit_xsmall_patch16_clip_224', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
 def clip_base_patch16_224_ft_in(pretrained: bool = False, **kwargs) -> VisionTransformer:
     # clip model params pre_norm=True
     model_args = dict(patch_size=16, embed_dim=768, depth=12, num_heads=12, pre_norm=True)
@@ -234,6 +242,7 @@ def clip_base_patch16_224(pretrained: bool = False, **kwargs) -> VisionTransform
     model_args = dict(patch_size=16, embed_dim=768, depth=12, num_heads=12, pre_norm=True)
     model = _create_vision_transformer('vit_base_patch16_clip_224.openai', pretrained=pretrained, **dict(model_args, **kwargs))
     return model
+
 
 # dinov2 
 def dinov2_tiny_patch14_518(pretrained: bool = False, **kwargs) -> VisionTransformer:
@@ -257,6 +266,41 @@ def dinov2_large_patch14_518(pretrained: bool = False, **kwargs):
     model_args = dict(patch_size=14, embed_dim=1024, depth=24, num_heads=16, init_values=1e-5, img_size=518)
     model = _create_vision_transformer('vit_large_patch14_dinov2.lvd142m', pretrained=pretrained, **dict(model_args, **kwargs))
     return model
+
+
+# deit-3
+def deit3_small_patch16_224(pretrained=False, **kwargs) -> VisionTransformer:
+    """ DeiT-3 small model @ 224x224 from paper (https://arxiv.org/abs/2204.07118).
+    ImageNet-1k weights from https://github.com/facebookresearch/deit.
+    """
+    model_args = dict(patch_size=16, embed_dim=384, depth=12, num_heads=6, no_embed_class=True, init_values=1e-6)
+    model = _create_vision_transformer('deit3_small_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+    
+def deit3_medium_patch16_224(pretrained=False, **kwargs) -> VisionTransformer:
+    """ DeiT-3 medium model @ 224x224 (https://arxiv.org/abs/2012.12877).
+    ImageNet-1k weights from https://github.com/facebookresearch/deit.
+    """
+    model_args = dict(patch_size=16, embed_dim=512, depth=12, num_heads=8, no_embed_class=True, init_values=1e-6)
+    model = _create_vision_transformer('deit3_medium_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
+def deit3_base_patch16_224(pretrained=False, **kwargs) -> VisionTransformer:
+    """ DeiT-3 base model @ 224x224 from paper (https://arxiv.org/abs/2204.07118).
+    ImageNet-1k weights from https://github.com/facebookresearch/deit.
+    """
+    model_args = dict(patch_size=16, embed_dim=768, depth=12, num_heads=12, no_embed_class=True, init_values=1e-6)
+    model = _create_vision_transformer('deit3_base_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
+def deit3_large_patch16_224(pretrained=False, **kwargs) -> VisionTransformer:
+    """ DeiT-3 large model @ 224x224 from paper (https://arxiv.org/abs/2204.07118).
+    ImageNet-1k weights from https://github.com/facebookresearch/deit.
+    """
+    model_args = dict(patch_size=16, embed_dim=1024, depth=24, num_heads=16, no_embed_class=True, init_values=1e-6)
+    model = _create_vision_transformer('deit3_large_patch16_224', pretrained=pretrained, **dict(model_args, **kwargs))
+    return model
+
 
 if __name__ == "__main__":
     input = torch.randn(1, 3, 224, 224)

@@ -35,7 +35,7 @@ def get_dataset(cfg):
             )
         else:
             if 'dinov2' in cfg.DISTILLER.TEACHER:
-                    train_loader, val_loader, num_data = get_imagenet_dataloaders(
+                train_loader, val_loader, num_data = get_imagenet_dataloaders(
                     batch_size=cfg.SOLVER.BATCH_SIZE,
                     val_batch_size=cfg.DATASET.TEST.BATCH_SIZE,
                     num_workers=cfg.DATASET.NUM_WORKERS,
